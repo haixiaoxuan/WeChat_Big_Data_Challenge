@@ -1,12 +1,16 @@
 # coding: utf-8
 import os
 import time
-import logging 
+import logging
+import numpy as np
+import pandas as pd
+
+
+# log setting
 LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s" 
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT) 
 logger = logging.getLogger(__file__)
-import numpy as np
-import pandas as pd
+
 
 # 存储数据的根目录
 ROOT_PATH = "./data"
@@ -19,6 +23,8 @@ FEED_EMBEDDINGS = os.path.join(DATASET_PATH, "feed_embeddings.csv")
 # 测试集
 TEST_FILE = os.path.join(DATASET_PATH, "test_a.csv")
 END_DAY = 15
+
+# 随机
 SEED = 2021
 
 # 初赛待预测行为列表
@@ -232,4 +238,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    

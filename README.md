@@ -38,12 +38,12 @@
 
 ## **4. 运行流程**
 - 新建data目录，下载比赛数据集，放在data目录下并解压，得到wechat_algo_data1目录
-- 生成特征/样本：python comm.py （自动新建data目录下用于存储特征、样本和模型的各个目录）
-- 训练离线模型：python baseline.py offline_train 
-- 评估离线模型：python baseline.py evaluate  （生成data/evaluate/submit_${timestamp}.csv）
-- 训练在线模型：python baseline.py online_train 
-- 生成提交文件：python baseline.py submit  （生成data/submit/submit_${timestamp}.csv）
-- 评估代码: evaluation.py
+- 生成特征/样本：python comm.py （自动新建data目录下用于存储特征、样本和模型的各个目录）  耗时：187s
+- 训练离线模型：python baseline.py offline_train   耗时：542s
+- 评估离线模型：python baseline.py evaluate  （生成data/evaluate/submit_${timestamp}.csv）   耗时：116s
+- 训练在线模型：python baseline.py online_train    耗时：586s
+- 生成提交文件：python baseline.py submit  （生成data/submit/submit_${timestamp}.csv）   耗时：68s
+- 评估代码: evaluation.py 
 
 ## **5. 模型及特征**
 - 模型：[Wide & Deep](https://dl.acm.org/doi/pdf/10.1145/2988450.2988454)
