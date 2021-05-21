@@ -2,13 +2,14 @@
 import time
 import traceback
 from collections import defaultdict
-import logging 
-LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s" 
-logging.basicConfig(level=logging.INFO, format=LOG_FORMAT) 
-logger = logging.getLogger(__file__)
+import logging
 import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
+
+LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
+logger = logging.getLogger(__file__)
 
 
 def uAUC(labels, preds, user_id_list):
@@ -38,9 +39,9 @@ def uAUC(labels, preds, user_id_list):
     for user_id in user_flag:
         if user_flag[user_id]:
             auc = roc_auc_score(np.asarray(user_truth[user_id]), np.asarray(user_pred[user_id]))
-            total_auc += auc 
+            total_auc += auc
             size += 1.0
-    user_auc = float(total_auc)/size
+    user_auc = float(total_auc) / size
     return user_auc
 
 
@@ -56,7 +57,7 @@ def compute_weighted_score(score_dict, weight_dict):
     weight_sum = 0.0
     for action in score_dict:
         weight = float(weight_dict[action])
-        score += weight*score_dict[action]
+        score += weight * score_dict[action]
         weight_sum += weight
     score /= float(weight_sum)
     score = round(score, 6)
@@ -98,7 +99,7 @@ def score(result_data, label_data, mode="初赛"):
         # 规范检查
         logger.info('Check result file')
         if result_df.shape[0] != label_df.shape[0]:
-            err_msg = "结果文件的行数（%i行）与测试集（%i行）不一致"%(result_df.shape[0], label_df.shape[0])
+            err_msg = "结果文件的行数（%i行）与测试集（%i行）不一致" % (result_df.shape[0], label_df.shape[0])
             res = {
                 "ret": 1,
                 "err_msg": err_msg,
@@ -111,7 +112,7 @@ def score(result_data, label_data, mode="初赛"):
             if col not in result_cols:
                 err_cols.append(col)
         if len(err_cols) > 0:
-            err_msg = "结果文件缺少字段/列：%s"%(', '.join(err_cols))
+            err_msg = "结果文件缺少字段/列：%s" % (', '.join(err_cols))
             res = {
                 "ret": 2,
                 "err_msg": err_msg,
@@ -123,10 +124,10 @@ def score(result_data, label_data, mode="初赛"):
         result_actions = []
         label_actions = []
         for action in actions:
-            result_actions_map[action] = "result_"+action
-            result_actions.append("result_"+action)
-            label_actions_map[action] = "label_"+action
-            label_actions.append("label_"+action)
+            result_actions_map[action] = "result_" + action
+            result_actions.append("result_" + action)
+            label_actions_map[action] = "label_" + action
+            label_actions.append("label_" + action)
         result_df = result_df.rename(columns=result_actions_map)
         label_df = label_df.rename(columns=label_actions_map)
         df = label_df.merge(result_df, on=['userid', 'feedid'])
@@ -156,7 +157,7 @@ def score(result_data, label_data, mode="初赛"):
             uauc = uAUC(y_true_bev, y_pred_bev, userid_list)
             print(uauc)
             score_detail[action] = round(uauc, 6)
-            score += weight*uauc
+            score += weight * uauc
             weights_sum += weight
         score /= weights_sum
         score = round(score, 6)
@@ -173,14 +174,14 @@ def score(result_data, label_data, mode="初赛"):
         res = {
             "ret": 4,
             "err_msg": str(e)
-        }    
+        }
         logger.error(res)
     return res
 
-    
+
 if __name__ == '__main__':
     t = time.time()
     label_data = open('data/evaluate/evaluate_all_13_generate_sample.csv', 'r')
     result_data = open('data/evaluate/submit_1621511303.csv', 'r')
     res = score(result_data, label_data, mode='初赛')
-    print('Time cost: %.2f s'%(time.time()-t))
+    print('Time cost: %.2f s' % (time.time() - t))

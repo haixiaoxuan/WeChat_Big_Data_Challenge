@@ -25,7 +25,7 @@ TEST_FILE = os.path.join(DATASET_PATH, "test_a.csv")
 END_DAY = 15
 
 # 随机
-SEED = 666
+SEED = 2021
 
 # 初赛待预测行为列表
 ACTION_LIST = ["read_comment", "like", "click_avatar",  "forward"]
