@@ -9,7 +9,7 @@ import baseline
 
 if __name__ == "__main__":
 
-    comm.main()
+    # comm.main()
     baseline.main("offline_train")
     baseline.main("evaluate")
     # baseline.main("online_train")

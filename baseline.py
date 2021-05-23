@@ -267,9 +267,7 @@ def main(stage):
         }
         weight_auc = compute_weighted_score(eval_dict, weight_dict)
         print("Weighted uAUC: ", weight_auc)
-        mlflow.log_dict({
-            stage + "_uAUC": eval_dict
-        })
+        mlflow.log_metrics(eval_dict)
         mlflow.log_metric(stage + "_weight_auc", weight_auc)
 
     if stage in ["evaluate", "submit"]:

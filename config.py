@@ -6,9 +6,9 @@ root_path = "./data/"
 SEED = 666
 
 
-batch_size = 128
+batch_size = 512
 embed_dim = 10
-learning_rate = 0.1
+learning_rate = 0.02
 # If not None, embedding values are l2-normalized to this value.
 embed_l2 = None
 
