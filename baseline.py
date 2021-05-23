@@ -8,26 +8,11 @@ import tensorflow.compat.v1 as tf
 from tensorflow import feature_column as fc
 from comm import ACTION_LIST, STAGE_END_DAY, FEA_COLUMN_LIST
 from evaluation import uAUC, compute_weighted_score
+import config as self_config
+import mlflow
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
-
-flags = tf.app.flags
-FLAGS = flags.FLAGS
-
-flags.DEFINE_string('model_checkpoint_dir', './data/model', 'model dir')
-flags.DEFINE_string('root_path', './data/', 'data dir')
-flags.DEFINE_integer('batch_size', 128, 'batch_size')
-flags.DEFINE_integer('embed_dim', 10, 'embed_dim')
-flags.DEFINE_float('learning_rate', 0.1, 'learning_rate')
-
-# If not None, embedding values are l2-normalized to this value.
-flags.DEFINE_float('embed_l2', None, 'embedding l2 reg')
-
-SEED = 666
-
-
-dnn_hidden_units = [32, 8]
 
 
 class WideAndDeep(object):
@@ -51,15 +36,7 @@ class WideAndDeep(object):
                                 - "follow"
         """
         super(WideAndDeep, self).__init__()
-        self.num_epochs_dict = {
-            "read_comment": 1,
-            "like": 1,
-            "click_avatar": 1,
-            "favorite": 1,
-            "forward": 1,
-            "comment": 1,
-            "follow": 1
-        }
+        self.num_epochs_dict = self_config.num_epochs_dict
         self.estimator = None
         self.linear_feature_columns = linear_feature_columns
         self.dnn_feature_columns = dnn_feature_columns
@@ -73,24 +50,24 @@ class WideAndDeep(object):
             stage = "online_train"
 
         # 构造模型目录
-        model_checkpoint_stage_dir = os.path.join(FLAGS.model_checkpoint_dir, stage, self.action)
+        model_checkpoint_stage_dir = os.path.join(self_config.model_checkpoint_dir, stage, self.action)
         if not os.path.exists(model_checkpoint_stage_dir):
             os.makedirs(model_checkpoint_stage_dir)
         elif self.stage in ["online_train", "offline_train"]:
             del_file(model_checkpoint_stage_dir)
 
         # 优化器
-        optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate,
+        optimizer = tf.train.AdamOptimizer(learning_rate=self_config.learning_rate,
                                            beta1=0.9,
                                            beta2=0.999,
                                            epsilon=1)
 
-        config = tf.estimator.RunConfig(model_dir=model_checkpoint_stage_dir, tf_random_seed=SEED)
+        config = tf.estimator.RunConfig(model_dir=model_checkpoint_stage_dir, tf_random_seed=self_config.SEED)
         self.estimator = tf.estimator.DNNLinearCombinedClassifier(
             model_dir=model_checkpoint_stage_dir,
             linear_feature_columns=self.linear_feature_columns,
             dnn_feature_columns=self.dnn_feature_columns,
-            dnn_hidden_units=dnn_hidden_units,
+            dnn_hidden_units=self_config.dnn_hidden_units,
             dnn_optimizer=optimizer,
             config=config
         )
@@ -113,7 +90,7 @@ class WideAndDeep(object):
             ds = tf.data.Dataset.from_tensor_slices((dict(df)))
 
         if shuffle:
-            ds = ds.shuffle(buffer_size=len(df), seed=SEED)
+            ds = ds.shuffle(buffer_size=len(df), seed=self_config.SEED)
 
         ds = ds.batch(batch_size)
         if stage in ["online_train", "offline_train"]:
@@ -121,7 +98,7 @@ class WideAndDeep(object):
         return ds
 
     def input_fn_train(self, df, stage, action, num_epochs):
-        return self.df_to_dataset(df, stage, action, shuffle=True, batch_size=FLAGS.batch_size,
+        return self.df_to_dataset(df, stage, action, shuffle=True, batch_size=self_config.batch_size,
                                   num_epochs=num_epochs)
 
     def input_fn_predict(self, df, stage, action):
@@ -133,7 +110,7 @@ class WideAndDeep(object):
         """
         file_name = "{stage}_{action}_{day}_concate_sample.csv".format(stage=self.stage, action=self.action,
                                                                        day=STAGE_END_DAY[self.stage])
-        stage_dir = os.path.join(FLAGS.root_path, self.stage, file_name)
+        stage_dir = os.path.join(self_config.root_path, self.stage, file_name)
         df = pd.read_csv(stage_dir)
         self.estimator.train(
             input_fn=lambda: self.input_fn_train(df, self.stage, self.action, self.num_epochs_dict[self.action])
@@ -151,7 +128,7 @@ class WideAndDeep(object):
             action = "all"
         file_name = "{stage}_{action}_{day}_concate_sample.csv".format(stage=self.stage, action=action,
                                                                        day=STAGE_END_DAY[self.stage])
-        evaluate_dir = os.path.join(FLAGS.root_path, self.stage, file_name)
+        evaluate_dir = os.path.join(self_config.root_path, self.stage, file_name)
         df = pd.read_csv(evaluate_dir)
         userid_list = df['userid'].astype(str).tolist()
         predicts = self.estimator.predict(
@@ -171,7 +148,7 @@ class WideAndDeep(object):
         """
         file_name = "{stage}_{action}_{day}_concate_sample.csv".format(stage=self.stage, action="all",
                                                                        day=STAGE_END_DAY[self.stage])
-        submit_dir = os.path.join(FLAGS.root_path, self.stage, file_name)
+        submit_dir = os.path.join(self_config.root_path, self.stage, file_name)
         df = pd.read_csv(submit_dir)
         t = time.time()
         predicts = self.estimator.predict(
@@ -212,11 +189,11 @@ def get_feature_columns():
     bgm_singer_cate = fc.categorical_column_with_hash_bucket("bgm_singer_id", 40000, tf.int64)
     bgm_song_cate = fc.categorical_column_with_hash_bucket("bgm_song_id", 60000, tf.int64)
 
-    user_embedding = fc.embedding_column(user_cate, FLAGS.embed_dim, max_norm=FLAGS.embed_l2)
-    feed_embedding = fc.embedding_column(feed_cate, FLAGS.embed_dim, max_norm=FLAGS.embed_l2)
-    author_embedding = fc.embedding_column(author_cate, FLAGS.embed_dim, max_norm=FLAGS.embed_l2)
-    bgm_singer_embedding = fc.embedding_column(bgm_singer_cate, FLAGS.embed_dim)
-    bgm_song_embedding = fc.embedding_column(bgm_song_cate, FLAGS.embed_dim)
+    user_embedding = fc.embedding_column(user_cate, self_config.embed_dim, max_norm=self_config.embed_l2)
+    feed_embedding = fc.embedding_column(feed_cate, self_config.embed_dim, max_norm=self_config.embed_l2)
+    author_embedding = fc.embedding_column(author_cate, self_config.embed_dim, max_norm=self_config.embed_l2)
+    bgm_singer_embedding = fc.embedding_column(bgm_singer_cate, self_config.embed_dim)
+    bgm_song_embedding = fc.embedding_column(bgm_song_cate, self_config.embed_dim)
 
     dnn_feature_columns.append(user_embedding)
     dnn_feature_columns.append(feed_embedding)
@@ -240,11 +217,10 @@ def get_feature_columns():
     return dnn_feature_columns, linear_feature_columns
 
 
-def main(argv):
+def main(stage):
     t = time.time()
 
     dnn_feature_columns, linear_feature_columns = get_feature_columns()
-    stage = argv[1]
     print('Stage: %s' % stage)
 
     eval_dict = {}
@@ -262,6 +238,8 @@ def main(argv):
             model.train()
             ids, logits, action_uauc = model.evaluate()
             eval_dict[action] = action_uauc
+            if stage == "offline_train":
+                mlflow.log_artifact(os.path.join(self_config.model_checkpoint_dir, stage, action))
 
         if stage == "evaluate":
             # 评估线下测试集结果，计算单个行为的uAUC值，并保存预测结果
@@ -289,6 +267,10 @@ def main(argv):
         }
         weight_auc = compute_weighted_score(eval_dict, weight_dict)
         print("Weighted uAUC: ", weight_auc)
+        mlflow.log_dict({
+            stage + "_uAUC": eval_dict
+        })
+        mlflow.log_metric(stage + "_weight_auc", weight_auc)
 
     if stage in ["evaluate", "submit"]:
         # 保存所有行为的预测结果，生成submit文件
@@ -297,10 +279,12 @@ def main(argv):
         ids[["userid", "feedid"]] = ids[["userid", "feedid"]].astype(int)
         res = pd.concat([ids, actions], sort=False, axis=1)
         # 写文件
-        file_name = "submit_" + str(int(time.time())) + ".csv"
-        submit_file = os.path.join(FLAGS.root_path, stage, file_name)
+        file_name = "submit.csv"
+        submit_file = os.path.join(self_config.root_path, stage, file_name)
         print('Save to: %s' % submit_file)
         res.to_csv(submit_file, index=False)
+        if stage == "submit":
+            mlflow.log_artifact(submit_file)
 
     if stage == "submit":
         print('不同目标行为2000条样本平均预测耗时（毫秒）：')
@@ -308,7 +292,8 @@ def main(argv):
         print('单个目标行为2000条样本平均预测耗时（毫秒）：')
         print(np.mean([v for v in predict_time_cost.values()]))
     print('Time cost: %.2f s' % (time.time() - t))
+    mlflow.log_metric(stage + "_speed_time", round((time.time() - t), 0))
 
 
 if __name__ == "__main__":
-    tf.app.run(main)
+    main("online_train")

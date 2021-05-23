@@ -4,6 +4,8 @@ import time
 import logging
 import numpy as np
 import pandas as pd
+import config as self_config
+import mlflow
 
 
 # log setting
@@ -38,11 +40,6 @@ FEA_COLUMN_LIST = ["read_comment", "like", "click_avatar",  "forward", "comment"
 # 各个阶段数据集的设置的最后一天
 STAGE_END_DAY = {"online_train": 14, "offline_train": 12, "evaluate": 13, "submit": 15}
 
-# 负样本下采样比例(负样本:正样本)
-ACTION_SAMPLE_RATE = {"read_comment": 5, "like": 5, "click_avatar": 5, "forward": 10, "comment": 10, "follow": 10, "favorite": 10}
-# 各个行为构造训练数据的天数(负样本下采样限制)
-ACTION_DAY_NUM = {"read_comment": 10, "like": 10, "click_avatar": 10, "forward": 10, "comment": 10, "follow": 10, "favorite": 10}
-
 
 def create_dir():
     """
@@ -50,7 +47,7 @@ def create_dir():
     """
     # 创建data目录
     if not os.path.exists(ROOT_PATH):
-        print('Create dir: %s'%ROOT_PATH)
+        print('Create dir: %s' % ROOT_PATH)
         os.mkdir(ROOT_PATH)
     # data目录下需要创建的子目录
     need_dirs = ["offline_train", "online_train", "evaluate", "submit",
@@ -152,9 +149,9 @@ def generate_sample(stage="offline_train"):
             df = df.drop_duplicates(subset=['userid', 'feedid', action], keep='last')
         # 负样本下采样
         for action in ACTION_LIST:
-            action_df = df[(df["date_"] <= day) & (df["date_"] >= day - ACTION_DAY_NUM[action] + 1)]
+            action_df = df[(df["date_"] <= day) & (df["date_"] >= day - self_config.ACTION_DAY_NUM[action] + 1)]
             df_neg = action_df[action_df[action] == 0]
-            df_neg = df_neg.sample(frac=1.0/ACTION_SAMPLE_RATE[action], random_state=SEED, replace=False)
+            df_neg = df_neg.sample(frac=1.0/self_config.ACTION_SAMPLE_RATE[action], random_state=SEED, replace=False)
             df_all = pd.concat([df_neg, action_df[action_df[action] == 1]])
             col = ["userid", "feedid", "date_", "device"] + [action]
             file_name = os.path.join(stage_dir, stage + "_" + action + "_" + str(day) + "_generate_sample.csv")
@@ -236,7 +233,8 @@ def main():
         sample_arr = generate_sample(stage)
         logger.info('Concat sample with feature')
         concat_sample(sample_arr, stage)
-    print('Time cost: %.2f s'%(time.time()-t))
+    print('Time cost: %.2f s' % (time.time()-t))
+    mlflow.log_metric("feature_generate_speed_time", round(time.time() - t, 0))
 
 
 if __name__ == "__main__":
