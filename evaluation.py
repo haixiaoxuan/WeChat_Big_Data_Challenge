@@ -7,15 +7,22 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
 
+
 LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 logger = logging.getLogger(__file__)
 
 
 def uAUC(labels, preds, user_id_list):
-    """Calculate user AUC"""
+    """
+        计算单个行为每个用户的平均 auc
+        Calculate user AUC
+    """
+    # key为user_id, value 为预测值列表
     user_pred = defaultdict(lambda: [])
+    # key为user_id, value 为真实值列表
     user_truth = defaultdict(lambda: [])
+
     for idx, truth in enumerate(labels):
         user_id = user_id_list[idx]
         pred = preds[idx]
@@ -23,6 +30,7 @@ def uAUC(labels, preds, user_id_list):
         user_pred[user_id].append(pred)
         user_truth[user_id].append(truth)
 
+    # 如果一个用户真实值全是正样本或全是副样本，则设为false
     user_flag = defaultdict(lambda: False)
     for user_id in set(user_id_list):
         truths = user_truth[user_id]
@@ -46,13 +54,14 @@ def uAUC(labels, preds, user_id_list):
 
 
 def compute_weighted_score(score_dict, weight_dict):
-    '''基于多个行为的uAUC值，计算加权uAUC
-    Input:
-        scores_dict: 多个行为的uAUC值映射字典, dict
-        weights_dict: 多个行为的权重映射字典, dict
-    Output:
-        score: 加权uAUC值, float
-    '''
+    """
+        基于多个行为的uAUC值，计算加权uAUC
+        Input:
+            scores_dict: 多个行为的uAUC值映射字典, dict
+            weights_dict: 多个行为的权重映射字典, dict
+        Output:
+            score: 加权uAUC值, float
+    """
     score = 0.0
     weight_sum = 0.0
     for action in score_dict:
@@ -65,14 +74,17 @@ def compute_weighted_score(score_dict, weight_dict):
 
 
 def score(result_data, label_data, mode="初赛"):
-    '''评测结果: 多个行为的加权uAUC分数
-    Input:
-        result_data: 提交的结果文件，二进制格式
-        label_data: 对应的label文件，二进制格式
-        mode: 比赛阶段，String. "初赛"/"复赛"
-    Output:
-        result: 评测结果，dict
-    '''
+    """
+        评测结果: 多个行为的加权uAUC分数
+        Input:
+            result_data: 提交的结果文件，二进制格式
+            label_data: 对应的label文件，二进制格式
+            mode: 比赛阶段，String.
+                - "初赛"
+                - "复赛"
+        Output:
+            result: 评测结果，dict
+    """
     try:
         # 读取数据
         logger.info('Read data')
@@ -84,6 +96,7 @@ def score(result_data, label_data, mode="初赛"):
         else:
             # 复赛评估七个互动行为
             actions = ['read_comment', 'like', 'click_avatar', 'forward', 'favorite', 'comment', 'follow']
+
         # 互动行为权重映射表
         weights_map = {
             "read_comment": 4.0,  # 是否查看评论
@@ -94,10 +107,13 @@ def score(result_data, label_data, mode="初赛"):
             "comment": 1.0,  # 是否发表评论
             "follow": 1.0  # 是否关注
         }
+
         target_cols = ['userid', 'feedid'] + actions
         label_df = label_df[target_cols]
+
         # 规范检查
         logger.info('Check result file')
+        # 错误处理
         if result_df.shape[0] != label_df.shape[0]:
             err_msg = "结果文件的行数（%i行）与测试集（%i行）不一致" % (result_df.shape[0], label_df.shape[0])
             res = {
@@ -106,6 +122,8 @@ def score(result_data, label_data, mode="初赛"):
             }
             logger.error(res)
             return res
+
+        # 字段校验
         err_cols = []
         result_cols = set(result_df.columns)
         for col in target_cols:
@@ -119,6 +137,8 @@ def score(result_data, label_data, mode="初赛"):
             }
             logger.error(res)
             return res
+
+        # rename columns
         result_actions_map = {}
         label_actions_map = {}
         result_actions = []
@@ -128,9 +148,13 @@ def score(result_data, label_data, mode="初赛"):
             result_actions.append("result_" + action)
             label_actions_map[action] = "label_" + action
             label_actions.append("label_" + action)
+
         result_df = result_df.rename(columns=result_actions_map)
         label_df = label_df.rename(columns=label_actions_map)
+
         df = label_df.merge(result_df, on=['userid', 'feedid'])
+
+        # 错误处理
         if len(df) != len(label_df):
             err_msg = "结果文件中userid-feedid与测试集不一致"
             res = {
@@ -139,12 +163,14 @@ def score(result_data, label_data, mode="初赛"):
             }
             logger.error(res)
             return res
+
         # 计算分数
         logger.info('Compute score')
         y_true = df[label_actions].astype(int).values
         y_pred = df[result_actions].astype(float).values.round(decimals=6)
         userid_list = df['userid'].astype(str).tolist()
         del df, result_df, label_df
+
         score = 0.0
         weights_sum = 0.0
         score_detail = {}
@@ -155,6 +181,7 @@ def score(result_data, label_data, mode="初赛"):
             weight = weights_map[action]
             # user AUC
             uauc = uAUC(y_true_bev, y_pred_bev, userid_list)
+            # 计算到每个行为的 uAUC
             print(uauc)
             score_detail[action] = round(uauc, 6)
             score += weight * uauc
@@ -169,6 +196,7 @@ def score(result_data, label_data, mode="初赛"):
             }
         }
         logger.info(res)
+
     except Exception as e:
         traceback.print_exc()
         res = {
