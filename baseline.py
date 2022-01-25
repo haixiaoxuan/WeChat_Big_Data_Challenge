@@ -69,7 +69,9 @@ class WideAndDeep(object):
             dnn_feature_columns=self.dnn_feature_columns,
             dnn_hidden_units=self_config.dnn_hidden_units,
             dnn_optimizer=optimizer,
-            config=config
+            config=config,
+            # batch_norm=True,
+            # dnn_dropout=0.5
         )
 
     def df_to_dataset(self, df, stage, action, shuffle=True, batch_size=128, num_epochs=1):
@@ -112,9 +114,19 @@ class WideAndDeep(object):
                                                                        day=STAGE_END_DAY[self.stage])
         stage_dir = os.path.join(self_config.root_path, self.stage, file_name)
         df = pd.read_csv(stage_dir)
-        self.estimator.train(
-            input_fn=lambda: self.input_fn_train(df, self.stage, self.action, self.num_epochs_dict[self.action])
-        )
+
+        # self.estimator.train(
+        #     input_fn=lambda: self.input_fn_train(df, self.stage, self.action, self.num_epochs_dict[self.action]),
+        #     steps=1000
+        # ).evaluate(
+        #     input_fn=lambda: self.input_fn_predict(df, self.stage, self.action),
+        #     steps=100
+        # )
+        # print("==== evaluate end ...")
+
+        train_spec = tf.estimator.TrainSpec(lambda: self.input_fn_train(df, self.stage, self.action, self.num_epochs_dict[self.action]))
+        eval_spec = tf.estimator.EvalSpec(lambda: self.input_fn_predict(df, self.stage, self.action))
+        tf.estimator.train_and_evaluate(self.estimator, train_spec, eval_spec)
 
     def evaluate(self):
         """

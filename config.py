@@ -8,20 +8,22 @@ SEED = 666
 
 batch_size = 512
 embed_dim = 10
-learning_rate = 0.02
+learning_rate = 0.1
 # If not None, embedding values are l2-normalized to this value.
 embed_l2 = None
 
 dnn_hidden_units = [32, 8]
 
+
+base_epochs = 1
 num_epochs_dict = {
-    "read_comment": 1,
-    "like": 1,
-    "click_avatar": 1,
-    "favorite": 1,
-    "forward": 1,
-    "comment": 1,
-    "follow": 1
+    "read_comment": base_epochs,
+    "like": base_epochs,
+    "click_avatar": base_epochs,
+    "favorite": base_epochs * 2,
+    "forward": base_epochs,
+    "comment": base_epochs,
+    "follow": base_epochs
 }
 
 
@@ -43,3 +45,6 @@ mlflow.log_params({
 })
 
 mlflow.log_artifact("./config.py")
+mlflow.log_artifact("./baseline.py")
+mlflow.log_artifact("./comm.py")
+mlflow.log_artifact("./evaluation.py")
